@@ -1,25 +1,13 @@
-from src.model.encoder import Encoder
-from src.config import config
+import utility as root_project
+
+root_project
+
+from src.config import *
+from src.model import *
 
 import torch
 import re
 import string
-
-# ====================== Kamus Typo dan Kata Gaul ======================
-typo_dict = {
-    "kmu": "kamu", "gk": "nggak", "smangat": "semangat", "gpp": "tidak apa-apa",
-    "btw": "ngomong-ngomong", "wkwk": "haha", "wkwwk": "haha", "wkwkwk": "haha",
-    "pls": "please", "thx": "terima kasih", "makasi": "terima kasih", 
-    "makasih": "terima kasih", "tq": "terima kasih", "u": "you", 
-    "luv": "love", "omg": "ya ampun", "ntar": "nanti",
-}
-
-# ====================== Daftar Akronim yang Dikecualikan dari Lowercase ======================
-known_acronyms = {
-    "USA", "NASA", "UNESCO", "AI", "ML", "IT", "CPU", "GPU", "HTML",
-    "API", "JSON", "PDF", "SQL", "UN", "WHO", "COVID", "WWW", "URL",
-    "HTTP", "HTTPS", "ID", "KTP"
-}
 
 
 # ====================== Normalisasi Typo ======================

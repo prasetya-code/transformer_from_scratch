@@ -1,5 +1,16 @@
-from src.model.encoder import Encoder
-from src.config import config
+from pathlib import Path
+import sys
+
+# 
+file_path = Path(__file__).resolve().parent
+project_root = file_path.parent
+
+# Jangan lupa diubah ke string untuk sys.path
+sys.path.append(str(project_root)) 
+
+# Sekarang Python dijamin bisa menemukan dir root project'
+from src.config import *
+from src.model import *
 
 import torch
 import re
@@ -8,30 +19,12 @@ import spacy
 
 # ====================== Load Multilingual spaCy Model ======================
 try:
-    # Path tujuan penyimpanan model
     model_name = 'xx_sent_ud_sm'
     model_path = f'src/spacy/{model_name}'
-
     nlp = spacy.load(model_path)
-
+    
 except OSError:
     raise RuntimeError(f"Model spaCy {model_name} belum diunduh.")
-
-# ====================== Kamus Typo dan Kata Gaul ======================
-typo_dict = {
-    "kmu": "kamu", "gk": "nggak", "smangat": "semangat", "gpp": "tidak apa-apa",
-    "btw": "ngomong-ngomong", "wkwk": "haha", "wkwwk": "haha", "wkwkwk": "haha",
-    "pls": "please", "thx": "terima kasih", "makasi": "terima kasih", 
-    "makasih": "terima kasih", "tq": "terima kasih", "u": "you", 
-    "luv": "love", "omg": "ya ampun",
-}
-
-# ====================== Daftar Akronim yang Dikecualikan dari Lowercase ======================
-known_acronyms = {
-    "USA", "NASA", "UNESCO", "AI", "ML", "IT", "CPU", "GPU", "HTML",
-    "API", "JSON", "PDF", "SQL", "UN", "WHO", "COVID", "WWW", "URL",
-    "HTTP", "HTTPS", "ID", "KTP"
-}
 
 
 # ====================== Normalisasi Typo ======================
@@ -41,53 +34,60 @@ def normalize_typo(text):
     normalized_words = [typo_dict.get(word.lower(), word) for word in words]
     return ' '.join(normalized_words)
 
-
-# ====================== Smart Lowercase untuk Token ======================
+# ====================== Smart Lowercase ======================
 def smart_lowercase(token):
     if token in known_acronyms or (token.isupper() and len(token) <= 5) or token == "I":
         return token
     return token.lower()
 
-
-# ====================== Tokenisasi dan Pemisahan Kalimat (Multilingual) ======================
+# ====================== Tokenisasi dan Pemisahan Kalimat Hybrid ======================
 def tokenize_and_split_sentences(text):
-    # Preprocessing: ubah ... menjadi .
-    text = re.sub(r"\.\.\.+", ".", text)
+    # ---------------- Proteksi entitas penting ----------------
+    protected_patterns = {
+        r"\b(www)\s*\.\s*([a-zA-Z0-9-]+)\s*\.\s*([a-zA-Z]{2,})\b": r"\1<DOT>\2<DOT>\3",
+        r"\b([a-zA-Z0-9._%+-]+)\s*@\s*([a-zA-Z0-9.-]+)\s*\.\s*([a-zA-Z]{2,})\b": r"\1<AT>\2<DOT>\3",
+        r"(?<=\d)\s*[.,]\s*(?=\d)": r"<DECIMAL>",  # desimal
+        r"(\d+)\s*%\s*": r"\1<PC>"  # persentase
+    }
+    for pattern, repl in protected_patterns.items():
+        text = re.sub(pattern, repl, text)
 
-    # Normalisasi typo/gaul
+    # ---------------- Normalisasi typo ----------------
     text = normalize_typo(text)
 
-    # Gunakan spaCy multilingual untuk pemisahan kalimat
+    # ---------------- Pemisahan kalimat spaCy ----------------
     doc = nlp(text)
     sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
 
-    # Gunakan regex tokenizer kustom
+    # ---------------- Tokenisasi per kalimat (regex custom) ----------------
     token_pattern = r"""
         (?:https?://[^\s]+) |
-        (?:\b(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?:/[^\s]*)? |
-        (?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}) |
+        (?:\b(?:www\.)?[a-zA-Z0-9.-]+(?:<DOT>[a-zA-Z]+)+) |
+        (?:[a-zA-Z0-9._%+-]+<AT>[a-zA-Z0-9.-]+(?:<DOT>[a-zA-Z]+)+) |
         (?:@\w+) |
         (?:\#\w+) |
         (?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}) |
         (?:\d{4}[-/]\d{1,2}[-/]\d{1,2}) |
-        (?:\d{1,2}\s+\w+\s+\d{2,4}) |
-        (?:\w+\s+\d{1,2},\s+\d{4}) |
         (?:\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?) |
-        (?:\d+(?:\.\d+)?%) |
+        (?:\d+(?:<DECIMAL>\d+)?<PC>?) |
         (?:[$€£¥₩₹]\s?\d+(?:[.,]\d+)*) |
         (?:rp\s?\d+(?:[.,]\d+)*) |
         (?:\b\w+\b) |
         (?:[^\w\s])
     """
-
     all_tokens = []
     for sentence in sentences:
         raw_tokens = re.findall(token_pattern, sentence, flags=re.VERBOSE)
         tokens = [smart_lowercase(tok) for tok in raw_tokens if tok.strip()]
         all_tokens.extend(tokens)
 
-    return all_tokens, sentences
+    # ---------------- Unprotect simbol ----------------
+    def unprotect(s):
+        return s.replace("<DOT>", ".").replace("<AT>", "@").replace("<DECIMAL>", ".").replace("<PC>", "%")
+    all_tokens = [unprotect(tok) for tok in all_tokens]
+    sentences = [unprotect(s) for s in sentences]
 
+    return all_tokens, sentences
 
 # ====================== Bangun Vocab dari Teks ======================
 def build_vocab_from_text(text):
@@ -96,7 +96,6 @@ def build_vocab_from_text(text):
     for i, word in enumerate(sorted(set(tokens)), start=2):
         vocab[word] = i
     return vocab, tokens, sentences
-
 
 # ====================== Unit Test Dinamis untuk Encoder ======================
 def test_encoder_user_text_dynamic():
@@ -151,11 +150,6 @@ def test_encoder_user_text_dynamic():
     print("📌 Output shape (batch kalimat):", output_batch.shape)
     print("📌 Output tensor (batch kalimat):\n", output_batch)
 
-
+# ====================== Main ======================
 if __name__ == "__main__":
-
-    """
-    with lib spacy
-    """
-
     test_encoder_user_text_dynamic()

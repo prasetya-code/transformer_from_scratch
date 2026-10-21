@@ -1,4 +1,14 @@
-config = {
+from pathlib import Path
+
+# Lokasi file saat ini
+CONFIG_PATH = Path(__file__).resolve().parent
+# print(f"CONFIG FILE LOCATION: {CONFIG_FILE}")
+
+# Absolute path ke ROOT PROJECT
+ROOT_PROJECT = CONFIG_PATH.parent
+# print(f"ABSOLUTE ROOT PROJECT DIRECTORY: {ROOT_PROJECT}")
+
+""" config = {
     "batch_size": 2,                # Jumlah data / input yang diproses dalam satu batch (2 kalimat / token sequence sekaligus)
     "seq_len": 10,                  # Panjang setiap sequence input (misal jumlah token / kata dalam satu kalimat)
 
@@ -14,4 +24,32 @@ config = {
     "learning_rate": 1e-4,          # Learning rate (kecepatan belajar model)
     "epochs": 10,                   # Jumlah epoch (berapa kali semua data dilatih)
     "device": "cuda"                # device use ("gpu" atau "cpu")
+} """
+
+# Kamus Typo dan Kata Gaul
+typo_dict = {
+    "kmu": "kamu",
+    "gk": "nggak",
+    "smangat": "semangat",
+    "gpp": "tidak apa-apa",
+    "btw": "ngomong-ngomong",
+    "wkwk": "haha",
+    "wkwwk": "haha",
+    "wkwkwk": "haha",
+    "pls": "please",
+    "thx": "terima kasih",
+    "makasi": "terima kasih",
+    "makasih": "terima kasih",
+    "tq": "terima kasih",
+    "u": "you",
+    "luv": "love",
+    "omg": "ya ampun",
+    "ntar": "nanti"
+}
+
+# Daftar Akronim yang Dikecualikan dari Lowercase
+known_acronyms = {
+    "AI", "API", "COVID", "CPU", "GPU", "HTML", "HTTP", "HTTPS", 
+    "ID", "IT", "JSON", "KTP", "ML", "NASA", "PDF", "SQL", 
+    "UN", "UNESCO", "URL", "USA", "WHO", "WWW"
 }
